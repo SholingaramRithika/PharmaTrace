@@ -1,0 +1,398 @@
+[
+ {
+  "id": "match_batch",
+  "title": "Look up a batch with medicine and manufacturer",
+  "category": "MATCH",
+  "kind": "read",
+  "description": "Anchors on the unique batchId (index seek) then follows two relationships.",
+  "concept": "MATCH, index seek",
+  "params": {
+   "batchId": {
+    "type": "string",
+    "default": "BATCH-VALID-001",
+    "pattern": "^[A-Za-z0-9\\-]{3,40}$"
+   }
+  },
+  "graph": false,
+  "cypher": "MATCH (m:Medicine)-[:HAS_BATCH]->(b:Batch {batchId: $batchId})\nOPTIONAL MATCH (o:Organization)-[:MANUFACTURES]->(b)\nRETURN b.batchId AS batchId, m.name AS medicine, o.name AS manufacturer,\n       toString(b.manufacturingDate) AS manufactured, toString(b.expiryDate) AS expires,\n       b.quantity AS quantity, b.status AS status"
+ },
+ {
+  "id": "batch_counts",
+  "title": "Batches per medicine (aggregation)",
+  "category": "Aggregation",
+  "kind": "read",
+  "description": "Counts batches and sums quantity per medicine. Implicit grouping by the non-aggregated column.",
+  "concept": "Aggregation",
+  "params": {},
+  "graph": false,
+  "cypher": "MATCH (m:Medicine)-[:HAS_BATCH]->(b:Batch)\nWHERE coalesce(b.isTestRecord, false) = false\nRETURN m.name AS medicine, m.category AS category, count(b) AS batches, sum(b.quantity) AS totalUnits\nORDER BY batches DESC, medicine"
+ },
+ {
+  "id": "upstream_suppliers",
+  "title": "Upstream: who supplied and made a batch",
+  "category": "Traversal",
+  "kind": "read",
+  "description": "Walks relationships backwards (incoming direction) from a batch to its upstream parties.",
+  "concept": "Upstream traversal",
+  "params": {
+   "batchId": {
+    "type": "string",
+    "default": "BATCH-UNVER-001",
+    "pattern": "^[A-Za-z0-9\\-]{3,40}$"
+   }
+  },
+  "graph": true,
+  "cypher": "MATCH p = (x)-[:MANUFACTURES|SUPPLIES_TO|HAS_BATCH]->(b:Batch {batchId: $batchId})\nRETURN p"
+ },
+ {
+  "id": "downstream_varlen",
+  "title": "Downstream destinations (variable-length path)",
+  "category": "Traversal",
+  "kind": "read",
+  "description": "Follows 0..3 FOLLOWED_BY hops between shipment legs, then DELIVERED_TO. Bounded to avoid unbounded expansion.",
+  "concept": "Variable-length path",
+  "params": {
+   "batchId": {
+    "type": "string",
+    "default": "BATCH-RECALL-001",
+    "pattern": "^[A-Za-z0-9\\-]{3,40}$"
+   }
+  },
+  "graph": true,
+  "cypher": "MATCH p = (b:Batch {batchId: $batchId})-[:TRANSPORTED_IN]->(:Shipment)\n           -[:FOLLOWED_BY*0..3]->(s:Shipment)-[:DELIVERED_TO]->(dest)\nRETURN p"
+ },
+ {
+  "id": "shortest_path",
+  "title": "Shortest path from batch to pharmacy",
+  "category": "Path analysis",
+  "kind": "read",
+  "description": "shortestPath over any relationship type, ignoring direction, bounded to 8 hops.",
+  "concept": "shortestPath",
+  "params": {
+   "batchId": {
+    "type": "string",
+    "default": "BATCH-VALID-001",
+    "pattern": "^[A-Za-z0-9\\-]{3,40}$"
+   },
+   "pharmacyId": {
+    "type": "string",
+    "default": "PH-01",
+    "pattern": "^PH-[0-9]{2}$"
+   }
+  },
+  "graph": true,
+  "cypher": "MATCH (b:Batch {batchId: $batchId}), (p:Pharmacy {pharmacyId: $pharmacyId})\nMATCH path = shortestPath((b)-[*..8]-(p))\nRETURN path, length(path) AS hops"
+ },
+ {
+  "id": "recall_propagation",
+  "title": "Recall propagation: affected pharmacies and units",
+  "category": "Recall",
+  "kind": "read",
+  "description": "From a recall, traverse to affected batches, then every shipment that reached a pharmacy.",
+  "concept": "Recall propagation",
+  "params": {
+   "recallId": {
+    "type": "string",
+    "default": "RCL-001",
+    "pattern": "^RCL-[0-9]{3}$"
+   }
+  },
+  "graph": false,
+  "cypher": "MATCH (r:Recall {recallId: $recallId})<-[:AFFECTED_BY]-(b:Batch)\n      -[:TRANSPORTED_IN]->(s:Shipment)-[:DELIVERED_TO]->(p:Pharmacy)\nRETURN p.pharmacyId AS pharmacyId, p.name AS pharmacy, p.region AS region,\n       collect(DISTINCT b.batchId) AS batches, sum(s.quantity) AS unitsDelivered\nORDER BY unitsDelivered DESC"
+ },
+ {
+  "id": "recall_graph",
+  "title": "Recall impact subgraph",
+  "category": "Recall",
+  "kind": "read",
+  "description": "Returns the recall, affected batches and their downstream shipments as a graph.",
+  "concept": "Graph result",
+  "params": {
+   "recallId": {
+    "type": "string",
+    "default": "RCL-001",
+    "pattern": "^RCL-[0-9]{3}$"
+   }
+  },
+  "graph": true,
+  "cypher": "MATCH p = (r:Recall {recallId: $recallId})<-[:AFFECTED_BY]-(b:Batch)-[:TRANSPORTED_IN]->(s:Shipment)\n          -[:DELIVERED_TO]->(:Pharmacy)\nRETURN p LIMIT 100"
+ },
+ {
+  "id": "dup_lots",
+  "title": "Conflicting lot numbers",
+  "category": "Risk rule",
+  "kind": "read",
+  "description": "Groups batches by lotNumber; more than one batch per lot is flagged. (batchId itself is protected by a unique constraint.)",
+  "concept": "Duplicate detection",
+  "params": {},
+  "graph": false,
+  "cypher": "MATCH (b:Batch)\nWITH b.lotNumber AS lot, collect(b.batchId) AS batches\nWHERE size(batches) > 1\nRETURN lot, batches"
+ },
+ {
+  "id": "unverified_suppliers",
+  "title": "Batches supplied by non-verified organizations",
+  "category": "Risk rule",
+  "kind": "read",
+  "description": "Finds SUPPLIES_TO relationships whose source is not Verified.",
+  "concept": "Unexpected relationship",
+  "params": {},
+  "graph": false,
+  "cypher": "MATCH (o:Organization)-[r:SUPPLIES_TO]->(b:Batch)\nWHERE o.verificationStatus <> 'Verified'\nRETURN o.name AS supplier, o.verificationStatus AS status, r.material AS material, b.batchId AS batchId"
+ },
+ {
+  "id": "expired_batches",
+  "title": "Expired batches as of a date",
+  "category": "Risk rule",
+  "kind": "read",
+  "description": "Temporal comparison on an indexed date property.",
+  "concept": "Expiry analysis",
+  "params": {
+   "asOf": {
+    "type": "string",
+    "default": "2026-10-18",
+    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+   }
+  },
+  "graph": false,
+  "cypher": "MATCH (b:Batch)\nWHERE b.expiryDate < date($asOf)\nRETURN b.batchId AS batchId, toString(b.expiryDate) AS expiry, b.status AS status"
+ },
+ {
+  "id": "quantity_check",
+  "title": "Shipment quantity consistency",
+  "category": "Risk rule",
+  "kind": "read",
+  "description": "Compares the inbound shipment quantity with the sum of the downstream legs.",
+  "concept": "Quantity consistency",
+  "params": {},
+  "graph": false,
+  "cypher": "MATCH (b:Batch)-[:TRANSPORTED_IN]->(s1:Shipment)\nWHERE NOT ()-[:FOLLOWED_BY]->(s1)\nOPTIONAL MATCH (s1)-[:FOLLOWED_BY]->(s2:Shipment)\nWITH b, s1, coalesce(sum(s2.quantity), 0) AS downstream\nWHERE downstream <> s1.quantity\nRETURN b.batchId AS batchId, s1.quantity AS inbound, downstream, downstream - s1.quantity AS difference"
+ },
+ {
+  "id": "high_degree",
+  "title": "Most connected entities",
+  "category": "Graph analytics",
+  "kind": "read",
+  "description": "Degree centrality computed with a COUNT subquery.",
+  "concept": "Degree centrality",
+  "params": {},
+  "graph": false,
+  "cypher": "MATCH (n)\nWITH n, COUNT { (n)--() } AS degree\nRETURN labels(n)[0] AS label, coalesce(n.name, n.batchId, n.shipmentId, n.eventId) AS entity, degree\nORDER BY degree DESC LIMIT 10"
+ },
+ {
+  "id": "warehouse_bottlenecks",
+  "title": "Warehouse concentration (bottleneck view)",
+  "category": "Graph analytics",
+  "kind": "read",
+  "description": "Counts distinct batches stored at each warehouse location.",
+  "concept": "Bottleneck identification",
+  "params": {},
+  "graph": false,
+  "cypher": "MATCH (b:Batch)-[:STORED_AT]->(l:Location)\nRETURN l.name AS warehouse, l.region AS region, count(DISTINCT b) AS batches\nORDER BY batches DESC"
+ },
+ {
+  "id": "orphan_check",
+  "title": "Shipments with no destination (missing links)",
+  "category": "Graph analytics",
+  "kind": "read",
+  "description": "Pattern predicate NOT (s)-[:DELIVERED_TO]->() finds incomplete paths.",
+  "concept": "Orphan / missing-link detection",
+  "params": {},
+  "graph": false,
+  "cypher": "MATCH (b:Batch)-[:TRANSPORTED_IN]->(s:Shipment)\nWHERE NOT (s)-[:DELIVERED_TO]->()\nRETURN b.batchId AS batchId, s.shipmentId AS shipmentId, s.status AS status"
+ },
+ {
+  "id": "show_indexes",
+  "title": "Inspect indexes",
+  "category": "Schema",
+  "kind": "read",
+  "description": "Lists indexes and their state.",
+  "concept": "Index inspection",
+  "params": {},
+  "graph": false,
+  "cypher": "SHOW INDEXES YIELD name, type, entityType, labelsOrTypes, properties, state\nRETURN name, type, entityType, labelsOrTypes, properties, state ORDER BY name"
+ },
+ {
+  "id": "show_constraints",
+  "title": "Inspect constraints",
+  "category": "Schema",
+  "kind": "read",
+  "description": "Lists constraints.",
+  "concept": "Constraint inspection",
+  "params": {},
+  "graph": false,
+  "cypher": "SHOW CONSTRAINTS YIELD name, type, entityType, labelsOrTypes, properties\nRETURN name, type, entityType, labelsOrTypes, properties ORDER BY name"
+ },
+ {
+  "id": "explain_lookup",
+  "title": "EXPLAIN: batch lookup by id",
+  "category": "Query plan",
+  "kind": "explain",
+  "description": "EXPLAIN shows the plan without executing. Expect a NodeUniqueIndexSeek.",
+  "concept": "EXPLAIN",
+  "params": {
+   "batchId": {
+    "type": "string",
+    "default": "BATCH-VALID-001",
+    "pattern": "^[A-Za-z0-9\\-]{3,40}$"
+   }
+  },
+  "graph": false,
+  "cypher": "EXPLAIN MATCH (b:Batch {batchId: $batchId}) RETURN b"
+ },
+ {
+  "id": "profile_traversal",
+  "title": "PROFILE: downstream traversal",
+  "category": "Query plan",
+  "kind": "profile",
+  "description": "PROFILE executes and reports db hits and rows per operator.",
+  "concept": "PROFILE",
+  "params": {
+   "batchId": {
+    "type": "string",
+    "default": "BATCH-RECALL-001",
+    "pattern": "^[A-Za-z0-9\\-]{3,40}$"
+   }
+  },
+  "graph": false,
+  "cypher": "PROFILE MATCH (b:Batch {batchId: $batchId})-[:TRANSPORTED_IN]->(:Shipment)-[:DELIVERED_TO]->(p:Pharmacy)\nRETURN p.name AS pharmacy, count(*) AS shipments"
+ },
+ {
+  "id": "create_test_batch",
+  "title": "CREATE a test batch",
+  "category": "CREATE",
+  "kind": "write",
+  "description": "Creates a TEST-* batch linked to a medicine. Re-running with the same id fails on the unique constraint.",
+  "concept": "CREATE + unique constraint",
+  "params": {
+   "batchId": {
+    "type": "string",
+    "default": "TEST-DEMO-1",
+    "pattern": "^TEST-[A-Z0-9\\-]{3,30}$"
+   },
+   "medicineId": {
+    "type": "string",
+    "default": "MED-001",
+    "pattern": "^MED-[0-9]{3}$"
+   },
+   "quantity": {
+    "type": "int",
+    "default": 500,
+    "min": 1,
+    "max": 1000000
+   }
+  },
+  "graph": false,
+  "cypher": "MATCH (m:Medicine {medicineId: $medicineId})\nCREATE (m)-[:HAS_BATCH]->(b:Batch {batchId: $batchId, lotNumber: 'LOT-TEST', manufacturingDate: date('2026-09-01'),\n       expiryDate: date('2028-09-01'), quantity: $quantity, status: 'Quarantined', isTestRecord: true})\nRETURN b.batchId AS batchId, b.status AS status, b.quantity AS quantity"
+ },
+ {
+  "id": "merge_test_batch",
+  "title": "MERGE a test batch (idempotent)",
+  "category": "MERGE",
+  "kind": "write",
+  "description": "MERGE matches or creates; running twice never duplicates.",
+  "concept": "MERGE ON CREATE / ON MATCH",
+  "params": {
+   "batchId": {
+    "type": "string",
+    "default": "TEST-DEMO-2",
+    "pattern": "^TEST-[A-Z0-9\\-]{3,30}$"
+   },
+   "quantity": {
+    "type": "int",
+    "default": 250,
+    "min": 1,
+    "max": 1000000
+   }
+  },
+  "graph": false,
+  "cypher": "MERGE (b:Batch {batchId: $batchId})\nON CREATE SET b.isTestRecord = true, b.status = 'Quarantined', b.quantity = $quantity, b.createdAt = datetime()\nON MATCH SET b.lastSeenAt = datetime()\nWITH b WHERE b.isTestRecord = true\nRETURN b.batchId AS batchId, b.status AS status, b.createdAt IS NOT NULL AS created"
+ },
+ {
+  "id": "set_test_status",
+  "title": "SET a property on a test batch",
+  "category": "SET",
+  "kind": "write",
+  "description": "Updates status; guarded so only isTestRecord nodes can change.",
+  "concept": "SET",
+  "params": {
+   "batchId": {
+    "type": "string",
+    "default": "TEST-DEMO-1",
+    "pattern": "^TEST-[A-Z0-9\\-]{3,30}$"
+   },
+   "status": {
+    "type": "string",
+    "default": "Released",
+    "enum": [
+     "Quarantined",
+     "Released",
+     "Recalled",
+     "Expired"
+    ]
+   }
+  },
+  "graph": false,
+  "cypher": "MATCH (b:Batch {batchId: $batchId}) WHERE b.isTestRecord = true\nSET b.status = $status, b.note = 'status changed in Database Lab'\nRETURN b.batchId AS batchId, b.status AS status, b.note AS note"
+ },
+ {
+  "id": "remove_test_note",
+  "title": "REMOVE a property",
+  "category": "REMOVE",
+  "kind": "write",
+  "description": "REMOVE deletes one property (not the node).",
+  "concept": "REMOVE",
+  "params": {
+   "batchId": {
+    "type": "string",
+    "default": "TEST-DEMO-1",
+    "pattern": "^TEST-[A-Z0-9\\-]{3,30}$"
+   }
+  },
+  "graph": false,
+  "cypher": "MATCH (b:Batch {batchId: $batchId}) WHERE b.isTestRecord = true\nREMOVE b.note\nRETURN b.batchId AS batchId, b.note IS NULL AS noteRemoved"
+ },
+ {
+  "id": "create_test_relationship",
+  "title": "Create a relationship",
+  "category": "CREATE",
+  "kind": "write",
+  "description": "MERGE a SUPPLIES_TO relationship from an organization to a test batch.",
+  "concept": "Relationship creation",
+  "params": {
+   "batchId": {
+    "type": "string",
+    "default": "TEST-DEMO-1",
+    "pattern": "^TEST-[A-Z0-9\\-]{3,30}$"
+   },
+   "organizationId": {
+    "type": "string",
+    "default": "ORG-S01",
+    "pattern": "^ORG-[A-Z][0-9]{2}$"
+   },
+   "material": {
+    "type": "string",
+    "default": "Demo material",
+    "pattern": "^[A-Za-z0-9 \\-]{1,40}$"
+   }
+  },
+  "graph": true,
+  "cypher": "MATCH (b:Batch {batchId: $batchId}) WHERE b.isTestRecord = true\nMATCH (o:Organization {organizationId: $organizationId})\nMERGE (o)-[r:SUPPLIES_TO {material: $material}]->(b)\nRETURN o.name AS supplier, type(r) AS rel, b.batchId AS batchId"
+ },
+ {
+  "id": "delete_test_batch",
+  "title": "Safe DELETE of a test batch",
+  "category": "DELETE",
+  "kind": "write",
+  "description": "DETACH DELETE removes the node and its relationships. Guarded to isTestRecord nodes only.",
+  "concept": "DELETE",
+  "params": {
+   "batchId": {
+    "type": "string",
+    "default": "TEST-DEMO-1",
+    "pattern": "^TEST-[A-Z0-9\\-]{3,30}$"
+   }
+  },
+  "graph": false,
+  "cypher": "MATCH (b:Batch {batchId: $batchId}) WHERE b.isTestRecord = true\nWITH b, b.batchId AS id\nDETACH DELETE b\nRETURN id AS deleted"
+ }
+]

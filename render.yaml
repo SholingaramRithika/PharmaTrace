@@ -1,0 +1,18 @@
+# Render blueprint for the FastAPI backend. Frontend deploys separately on Vercel (frontend/vercel.json).
+services:
+  - type: web
+    name: pharmatrace-api
+    runtime: python
+    rootDir: .
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - { key: APP_ENV, value: production }
+      - { key: ENABLE_WRITES, value: "false" }
+      - { key: NEO4J_DATABASE, value: neo4j }
+      - { key: NEO4J_URI, sync: false }        # e.g. neo4j+s://<id>.databases.neo4j.io  (set in the Render dashboard)
+      - { key: NEO4J_USER, sync: false }
+      - { key: NEO4J_PASSWORD, sync: false }   # secret: never commit
+      - { key: CORS_ORIGINS, sync: false }     # e.g. https://your-app.vercel.app
+      - { key: PYTHON_VERSION, value: "3.12.3" }
