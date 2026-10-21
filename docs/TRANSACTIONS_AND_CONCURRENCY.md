@@ -1,0 +1,8 @@
+# Transactions and Concurrency
+* Neo4j transactions are **ACID**: atomic (all-or-nothing), consistent (constraints hold at commit), isolated, durable (write-ahead transaction log). See the Operations/Cypher manuals.
+* Default isolation is **read committed**; writers take locks on the nodes/relationships they change, and the server detects deadlocks and aborts one transaction. Verify details for your version in the official docs.
+* **In this project** every database call runs in a managed transaction: `session.execute_read` for queries and `session.execute_write` for CRUD/Lab writes. The driver automatically **retries transient failures** (e.g. deadlock, leader change); retry time is capped at 3 s (`max_transaction_retry_time`) so outages surface quickly.
+* **Atomic multi-step write example:** *CREATE a test batch* matches the medicine, creates the batch and the `HAS_BATCH` relationship in a single statement; if the medicine does not exist nothing is created (the API returns 404).
+* **Idempotency:** `MERGE` templates and the loader can be repeated safely. `CREATE` templates rely on the unique constraint to prevent duplicates under concurrent calls: of two simultaneous creates of the same key, one fails with a constraint violation.
+* **Not tested:** concurrent-writer behaviour was not exercised in this project; claims above are about documented Neo4j semantics, not measured results here.
+* Reads of aggregates (risk findings, recall impact) are made of several statements, each its own transaction, so they are not one global snapshot; acceptable for a demo, noted as a limitation.
