@@ -29,7 +29,7 @@ PharmaTrace tracks medicine batches from manufacturer to pharmacy, visualizes su
 
 ## Architecture
 
-![PharmaTrace architecture](docs/images/architecture.svg)
+![PharmaTrace architecture](docs/architecture.svg)
 
 ## Getting Started
 
