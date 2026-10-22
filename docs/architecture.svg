@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 260" width="940" height="260" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+  </defs>
+  <rect width="940" height="260" rx="14" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="470" y="38" text-anchor="middle" font-size="20" font-weight="700" fill="#0f172a">PharmaTrace Architecture</text>
+
+  <!-- User -->
+  <rect x="30" y="95" width="150" height="90" rx="12" fill="#e2e8f0" stroke="#64748b" stroke-width="1.5"/>
+  <text x="105" y="135" text-anchor="middle" font-size="17" font-weight="700" fill="#0f172a">User</text>
+  <text x="105" y="158" text-anchor="middle" font-size="13" fill="#475569">Web browser</text>
+
+  <!-- Frontend -->
+  <rect x="260" y="95" width="190" height="90" rx="12" fill="#cffafe" stroke="#0891b2" stroke-width="1.5"/>
+  <text x="355" y="128" text-anchor="middle" font-size="16" font-weight="700" fill="#0f172a">React + TypeScript</text>
+  <text x="355" y="150" text-anchor="middle" font-size="13" fill="#155e75">Cytoscape.js graphs</text>
+  <text x="355" y="168" text-anchor="middle" font-size="12" fill="#155e75">Hosted on Vercel</text>
+
+  <!-- Backend -->
+  <rect x="530" y="95" width="170" height="90" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="615" y="128" text-anchor="middle" font-size="16" font-weight="700" fill="#0f172a">FastAPI backend</text>
+  <text x="615" y="150" text-anchor="middle" font-size="13" fill="#166534">Routers · Services</text>
+  <text x="615" y="168" text-anchor="middle" font-size="12" fill="#166534">Hosted on Render</text>
+
+  <!-- Database -->
+  <g>
+    <path d="M780,112 v62 a65,14 0 0 0 130,0 v-62" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+    <ellipse cx="845" cy="112" rx="65" ry="14" fill="#fde68a" stroke="#d97706" stroke-width="1.5"/>
+    <text x="845" y="150" text-anchor="middle" font-size="16" font-weight="700" fill="#0f172a">Neo4j 5</text>
+    <text x="845" y="170" text-anchor="middle" font-size="12" fill="#92400e">Graph database (Aura)</text>
+  </g>
+
+  <!-- Arrows -->
+  <line x1="180" y1="140" x2="258" y2="140" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="219" y="128" text-anchor="middle" font-size="12" fill="#475569">HTTPS</text>
+
+  <line x1="450" y1="140" x2="528" y2="140" stroke="#475569" stroke-width="2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <text x="489" y="128" text-anchor="middle" font-size="12" fill="#475569">REST API</text>
+  <text x="489" y="162" text-anchor="middle" font-size="11" fill="#64748b">JSON</text>
+
+  <line x1="700" y1="140" x2="778" y2="140" stroke="#475569" stroke-width="2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <text x="739" y="128" text-anchor="middle" font-size="12" fill="#475569">Cypher</text>
+  <text x="739" y="162" text-anchor="middle" font-size="11" fill="#64748b">Bolt</text>
+
+  <text x="470" y="232" text-anchor="middle" font-size="12" fill="#64748b">The browser never talks to Neo4j directly. Credentials stay on the backend.</text>
+</svg>
