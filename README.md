@@ -1,53 +1,142 @@
-# PharmaTrace — Pharmaceutical Supply Chain Traceability & Risk Intelligence (Neo4j)
+# PharmaTrace
 
-University DBMS case study. Graph-first traceability, risk and recall analysis on **Neo4j**, with a FastAPI backend.
-All data is **synthetic**; all organizations and medicines are fictional; seeded anomalies are simulated test scenarios.
+**Pharmaceutical supply chain traceability and risk intelligence, powered by Neo4j.**
 
-## Status (honest)
-Website project only: no presentation files are included.
-| Area | State |
+PharmaTrace tracks medicine batches from manufacturer to pharmacy, visualizes supply-chain relationships as an interactive graph, flags suspicious routes and records, and analyzes the impact of product recalls. It is a university DBMS case study built with a FastAPI backend and a React frontend.
+
+**Live demo:** https://pharma-trace-six.vercel.app
+
+> **Note:** All data is synthetic. Organizations, medicines, batches, and anomalies are fictional and intended for demonstration only.
+
+## Features
+
+- **Graph Explorer** — Search nodes, expand neighbours, and find shortest paths.
+- **Batch Traceability** — Follow a batch's journey and download a traceability report.
+- **Risk Intelligence** — Rule-based findings for duplicate lots, unverified suppliers, unexpected routes, expired batches, quantity mismatches, missing events, and incomplete paths.
+- **Recall Analysis** — Identify affected batches, pharmacies, and delivered units.
+- **Database Lab** — Run 24 allowlisted Cypher templates, including `EXPLAIN` and `PROFILE`.
+- **Database Insights** — Explore database counts, indexes, constraints, and query plans.
+- **Dark and light themes** — Switch the interface to your preferred theme.
+
+## Tech Stack
+
+| Layer | Technologies |
 |---|---|
-| Neo4j schema, deterministic dataset (485 nodes / 1,394 relationships, 8 seeded scenarios), 24 Cypher templates | Done. Offline-verified; **Cypher not yet run on a live Neo4j** |
-| FastAPI backend (25 endpoints) | Done. 106 offline tests pass (12 live-DB tests skipped) |
-| React frontend, all 9 routes, dark/light theme, Cytoscape graphs, bundled product illustrations | Done. 28 jsdom tests + production build pass. **Not yet seen in a real browser** |
-| Docs (20 documents incl. rubric mapping, demo guide, deployment) | Done; see `docs/` |
-| Online deployment | Config prepared (`render.yaml`, `vercel.json`); **not deployed** |
-Run `python tests/smoke_live.py` after setup to verify the live parts, then see `docs/TESTING.md`.
+| Database | Neo4j 5 |
+| Backend | Python, FastAPI, Neo4j Python driver |
+| Frontend | React, TypeScript, Vite, Tailwind CSS, Cytoscape.js |
+| Deployment configuration | Vercel (frontend), Render (API), Neo4j Aura (database) |
 
-## Quick start (Windows, Neo4j Desktop) — full details in `docs/LOCAL_SETUP.md`
-```powershell
-copy .env.example .env                 # set NEO4J_PASSWORD
-python -m venv backend\.venv ; backend\.venv\Scripts\Activate.ps1
-pip install -r backend\requirements.txt
-python database\setup_db.py all        # schema + data + validation
-cd backend ; python -m uvicorn app.main:app --reload --port 8000
-# new terminal (frontend):
+## Architecture
+
+![PharmaTrace architecture](docs/images/architecture.svg)
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.11 or newer
+- Node.js 20 or newer
+- A running Neo4j 5 database (Neo4j Desktop or Neo4j Aura)
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/SholingaramRithika/PharmaTrace.git
+cd PharmaTrace
+```
+
+### 2. Configure Neo4j
+
+Create a **root-level** `.env` file in the project directory with your Neo4j connection details:
+
+```env
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your-password
+```
+
+Use the URI and credentials provided by your Neo4j instance if you use Neo4j Aura. Never commit your real credentials.
+
+### 3. Install dependencies and load the database
+
+Run these commands from the **project root**:
+
+```bash
+python -m venv backend/.venv
+source backend/.venv/bin/activate
+# Windows PowerShell: .\backend\.venv\Scripts\Activate.ps1
+
+pip install -r backend/requirements.txt
+python database/setup_db.py all
+```
+
+Keep this terminal at the project root for database setup. Then start the backend in the same environment:
+
+```bash
+cd backend
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+The API documentation is available at http://localhost:8000/docs.
+
+### 4. Configure and start the frontend
+
+Open a **new terminal** from the project root:
+
+```bash
 cd frontend
-copy .env.example .env
+```
+
+Create `frontend/.env` with the following value (or copy `frontend/.env.example` if it contains the same setting):
+
+```env
+VITE_API_URL=http://localhost:8000
+```
+
+Then install dependencies and start the development server:
+
+```bash
 npm install
-npm run dev                            # http://localhost:5173
-
-# tests
-cd backend ; python -m pytest -q       # backend
-cd frontend ; npm test                 # frontend
+npm run dev
 ```
 
-## Layout
-```
-database/   schema.cypher · dataset.py (seeded generator) · setup_db.py (schema|load|validate|reset)
-            queries/catalogue.json (Lab templates) · validation/ (reference rules, report generator)
-backend/    app/ (config, db, routers/, services/) · tests/ · requirements.txt
-frontend/   src/ (App, Layout, theme, api, components, pages/) · public/products/*.svg (bundled illustrations) · vercel.json
-docs/       20 documents: INTRODUCTION … FUTURE_SCOPE (start with LOCAL_SETUP, DEMO_GUIDE, RUBRIC_COMPLIANCE)
-tests/      smoke_live.py (live end-to-end check) · README.md
-render.yaml Render blueprint for the API (frontend/vercel.json for Vercel)
+Open http://localhost:5173.
+
+## Project Structure
+
+```text
+PharmaTrace/
+├── backend/       # FastAPI application, routers, services, tests
+├── database/      # Neo4j schema, data generator, setup script, Cypher catalogue
+├── frontend/      # React application, pages, components, theme
+├── docs/          # Setup, architecture, schema, security, and demo documentation
+├── tests/         # End-to-end smoke tests
+└── render.yaml    # Render deployment blueprint
 ```
 
-## Security notes
-No credentials in code; `.env` is git-ignored. Cypher is parameterized; labels/relationship types come from allowlists.
-The Database Lab runs only allowlisted templates; writes are limited to `TEST-*` batches flagged `isTestRecord`, are off unless `ENABLE_WRITES=true`,
-and can require `X-Admin-Token`. CORS is restricted to `CORS_ORIGINS`; `/docs` is disabled when `APP_ENV=production`.
-A public deployment needs a separate hosted Neo4j (e.g. Aura) and backend; never expose the laptop's Neo4j Desktop.
+## Tests
 
-## Visual design layer
-The animated navy/cyan background (particle network, molecule/DNA motifs, glass panels) is purely visual. See `docs/BACKGROUND.md`.
+Run backend tests from the project root with the virtual environment activated:
+
+```bash
+cd backend
+python -m pytest -q
+```
+
+Run frontend tests in a separate terminal:
+
+```bash
+cd frontend
+npm test
+```
+
+Previously reported project checks include 106 backend offline tests and 28 frontend tests. Live Neo4j tests and real-browser visual verification may require additional setup; rerun the tests on your current checkout to confirm their status.
+
+## Documentation
+
+See [`docs/`](docs/) for detailed setup instructions, architecture, graph schema, deployment, security notes, testing, and the demo guide.
+
+## Scope and Limitations
+
+PharmaTrace is an academic demonstration built with fictional data and simulated anomalies. It is not a production pharmaceutical tracking system and is not intended for regulatory or clinical decision-making.
